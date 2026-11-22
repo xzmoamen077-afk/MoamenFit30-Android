@@ -95,7 +95,7 @@ public class MainActivity extends Activity {
                     payload.put("model", "Olala-v1.0-mini-7A1B");
                     payload.put("messages", messages);
                     payload.put("temperature", 0.5);
-                    payload.put("max_tokens", 420);
+                    payload.put("max_tokens", 220);
                     URL url = new URL("https://oai.endpoints.kepler.ai.cloud.ovh.net/v1/chat/completions");
                     connection = (HttpURLConnection) url.openConnection();
                     connection.setRequestMethod("POST");
