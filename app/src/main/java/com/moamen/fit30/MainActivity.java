@@ -17,6 +17,7 @@ import java.util.concurrent.Executors;
 public class MainActivity extends Activity {
     private WebView web;
     private final ExecutorService network = Executors.newSingleThreadExecutor();
+    private long lastAiRequestAt = 0L;
 
     public class PrayerBridge {
         @JavascriptInterface
@@ -70,6 +71,70 @@ public class MainActivity extends Activity {
                 }
             });
         }
+        @JavascriptInterface
+        public void ask(String requestId, String messagesJson) {
+            if (requestId == null || !requestId.matches("[0-9]{1,20}_[0-9]{1,6}") || messagesJson == null || messagesJson.length() > 24000) {
+                sendAiResult(requestId, "الطلب غير صالح. جرّب رسالة أقصر.", true);
+                return;
+            }
+            synchronized (MainActivity.this) {
+                long now = System.currentTimeMillis();
+                if (now - lastAiRequestAt < 30000L) {
+                    sendAiResult(requestId, "الخدمة المجانية محدودة بطلبين في الدقيقة. استنى نصف دقيقة وجرب تاني.", true);
+                    return;
+                }
+                lastAiRequestAt = now;
+            }
+            network.execute(() -> {
+                HttpURLConnection connection = null;
+                try {
+                    JSONArray messages = new JSONArray(messagesJson);
+                    JSONObject payload = new JSONObject();
+                    payload.put("model", "Olala-v1.0-mini-7A1B");
+                    payload.put("messages", messages);
+                    payload.put("temperature", 0.5);
+                    payload.put("max_tokens", 420);
+                    URL url = new URL("https://oai.endpoints.kepler.ai.cloud.ovh.net/v1/chat/completions");
+                    connection = (HttpURLConnection) url.openConnection();
+                    connection.setRequestMethod("POST");
+                    connection.setConnectTimeout(15000);
+                    connection.setReadTimeout(60000);
+                    connection.setDoOutput(true);
+                    connection.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
+                    connection.setRequestProperty("Accept", "application/json");
+                    byte[] bytes = payload.toString().getBytes("UTF-8");
+                    try (OutputStream out = connection.getOutputStream()) { out.write(bytes); }
+                    int status = connection.getResponseCode();
+                    java.io.InputStream stream = status >= 200 && status < 300 ? connection.getInputStream() : connection.getErrorStream();
+                    StringBuilder body = new StringBuilder();
+                    try (BufferedReader reader = new BufferedReader(new InputStreamReader(stream, "UTF-8"))) {
+                        String line;
+                        while ((line = reader.readLine()) != null) body.append(line);
+                    }
+                    if (status < 200 || status >= 300) {
+                        String msg = status == 429 ? "وصلنا للحد المجاني مؤقتًا. استنى دقيقة وجرب تاني." :
+                            "الخدمة مش متاحة حاليًا (" + status + "). جرّب بعد شوية.";
+                        sendAiResult(requestId, msg, true);
+                    } else {
+                        JSONObject response = new JSONObject(body.toString());
+                        String answer = response.getJSONArray("choices").getJSONObject(0).getJSONObject("message").optString("content", "");
+                        if (answer.trim().isEmpty()) throw new Exception("Empty model response");
+                        sendAiResult(requestId, answer.trim(), false);
+                    }
+                } catch (Exception e) {
+                    sendAiResult(requestId, "تعذّر الاتصال بالمساعد الذكي. تأكد من الإنترنت وجرب مرة تانية.", true);
+                } finally {
+                    if (connection != null) connection.disconnect();
+                }
+            });
+        }
+    }
+
+    private void sendAiResult(String requestId, String message, boolean isError) {
+        if (requestId == null) return;
+        runOnUiThread(() -> {
+            if (web != null) web.evaluateJavascript("window.onAIResponse(" + JSONObject.quote(requestId) + "," + JSONObject.quote(message) + "," + (isError ? "true" : "false") + ")", null);
+        });
     }
 
     private void sendPrayerResult(String json) {
@@ -95,6 +160,7 @@ public class MainActivity extends Activity {
         settings.setCacheMode(WebSettings.LOAD_NO_CACHE);
         web.clearCache(true);
         web.addJavascriptInterface(new PrayerBridge(), "AndroidPrayer");
+        web.addJavascriptInterface(new PrayerBridge(), "AndroidAI");
         web.setWebViewClient(new WebViewClient());
         web.setWebChromeClient(new WebChromeClient());
         setContentView(web);
