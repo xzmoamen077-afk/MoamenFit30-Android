@@ -20,6 +20,24 @@ public class MainActivity extends Activity {
 
     public class PrayerBridge {
         @JavascriptInterface
+        public void openChatGPT() {
+            runOnUiThread(() -> {
+                try {
+                    android.content.Intent intent = new android.content.Intent(android.content.Intent.ACTION_VIEW,
+                        android.net.Uri.parse("https://chatgpt.com/"));
+                    intent.setPackage("com.openai.chatgpt");
+                    startActivity(intent);
+                } catch (Exception appNotAvailable) {
+                    try {
+                        android.content.Intent browser = new android.content.Intent(android.content.Intent.ACTION_VIEW,
+                            android.net.Uri.parse("https://chatgpt.com/"));
+                        startActivity(browser);
+                    } catch (Exception ignored) {}
+                }
+            });
+        }
+
+        @JavascriptInterface
         public void loadPrayerTimes(String date) {
             if (date == null || !date.matches("[0-9]{2}-[0-9]{2}-[0-9]{4}")) {
                 sendPrayerError("تاريخ غير صالح");
