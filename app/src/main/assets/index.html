@@ -121,5 +121,5 @@ function restoreAssistantChat(){const history=read('assistantChat',[]);history.f
 function loadPrayerTimes(){let date=prayerDateKey();$('prayerStatus').textContent='جارٍ جلب المواقيت...';if(window.AndroidPrayer&&AndroidPrayer.loadPrayerTimes){AndroidPrayer.loadPrayerTimes(date)}else{$('prayerStatus').textContent='ميزة المواقيت تحتاج فتح التطبيق على أندرويد واتصال الإنترنت.'}}
 window.onPrayerTimes=function(raw){try{let data=typeof raw==='string'?JSON.parse(raw):raw;if(data.error)throw new Error(data.error);if(!data.timings)throw new Error('بيانات المواقيت غير مكتملة');renderPrayer(data)}catch(e){$('prayerStatus').textContent='تعذّر تحميل المواقيت. راجع موقع الهيئة المصرية العامة للمساحة من الرابط أدناه.'}};
 function render(){renderDays();renderMeals();renderNutrition();renderWorkout();renderHabits();renderSummary();$('waterToday').textContent=read(key('water'),0);$('waterCount').textContent=read(key('water'),0)+' / 6';$('note').value=read(key('note'),'');$('reminder').value=read('reminder','')}
-render();loadPrayerTimes();
+render();loadPrayerTimes();restoreAssistantChat();
 </script></body></html>
